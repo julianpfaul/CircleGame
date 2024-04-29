@@ -1,6 +1,8 @@
 #pragma once
 
 #include <set>
+#include <numeric>
+#include <cmath>
 #include "SFML/Graphics.hpp"
 #include "vector.h"
 #include "arena.h"
@@ -103,8 +105,8 @@ namespace jp::cg {
 					}
 				}
 
-				if(event.type == sf::Event::MouseWheelScrolled) {
-					if(event.mouseWheelScroll.delta > 0) {
+				if (event.type == sf::Event::MouseWheelScrolled) {
+					if (event.mouseWheelScroll.delta > 0) {
 						camera_zoom *= 1.1f;
 					} else {
 						camera_zoom /= 1.1f;
@@ -140,94 +142,15 @@ namespace jp::cg {
 				auto predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
 				auto predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
 
-				/*
-				/* arena collision x */
-				if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
-					auto normal_force = predicted_velocity;
-					normal_force.set_angle(predicted_position.get_negated().get_angle());
-					normal_force.set_x(0.0);
+				auto angles_of_collision_list = std::vector<f32>();
 
-					acceleration += normal_force;
-					predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
-					predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
-
-					if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
-						auto correction_vector = predicted_position;
-						correction_vector.set_magnitude(arena.get_radius() - player_radius);
-
-						predicted_position.set_x(correction_vector.get_x());
-					}
-				}
-
-				/* obstacle collision x */
-				for (auto& circle_obstacle: circle_list) {
-					auto difference_vector = (predicted_position - circle_obstacle.get_center());
-					if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
-						auto normal_force = predicted_velocity;
-						normal_force.set_angle(difference_vector.get_angle());
-						normal_force.set_x(0.0);
-
-						acceleration += normal_force;
-						predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
-						predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
-
-						difference_vector = (predicted_position - circle_obstacle.get_center());
-						if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
-							difference_vector.set_magnitude(circle_obstacle.get_radius() + player_radius);
-
-							predicted_position.set_x((circle_obstacle.get_center() + difference_vector).get_x());
-						}
-					}
-				}
-
-				/* arena collision y */
-				if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
-					auto normal_force = predicted_velocity;
-					normal_force.set_angle(predicted_position.get_negated().get_angle());
-					normal_force.set_y(0.0);
-
-					acceleration += normal_force;
-					predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
-					predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
-
-					if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
-						auto correction_vector = predicted_position;
-						correction_vector.set_magnitude(arena.get_radius() - player_radius);
-
-						predicted_position.set_y(correction_vector.get_y());
-					}
-				}
-
-				/* obstacle collision y */
-				for (auto& circle_obstacle: circle_list) {
-					auto difference_vector = (predicted_position - circle_obstacle.get_center());
-					if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
-						auto normal_force = predicted_velocity;
-						normal_force.set_angle(difference_vector.get_angle());
-						normal_force.set_y(0.0);
-
-						acceleration += normal_force;
-						predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
-						predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
-
-						difference_vector = (predicted_position - circle_obstacle.get_center());
-						if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
-							difference_vector.set_magnitude(circle_obstacle.get_radius() + player_radius);
-
-							predicted_position.set_y((circle_obstacle.get_center() + difference_vector).get_y());
-						}
-					}
-				}
-				*/
-
-					/* arena collision */
+				/* arena collision */
 				if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
 					auto normal_force = predicted_velocity;
 					normal_force.set_angle(predicted_position.get_negated().get_angle());
 
 					acceleration += normal_force;
-					predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
-					predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
+					angles_of_collision_list.push_back(normal_force.get_angle());
 
 					if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
 						auto correction_vector = predicted_position;
@@ -245,8 +168,7 @@ namespace jp::cg {
 						normal_force.set_angle(difference_vector.get_angle());
 
 						acceleration += normal_force;
-						predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
-						predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
+						angles_of_collision_list.push_back(normal_force.get_angle());
 
 						difference_vector = (predicted_position - circle_obstacle.get_center());
 						if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
@@ -255,6 +177,11 @@ namespace jp::cg {
 							predicted_position = circle_obstacle.get_center() + difference_vector;
 						}
 					}
+				}
+
+				if(!angles_of_collision_list.empty()) {
+					auto sum_angles_of_collision = std::accumulate(angles_of_collision_list.begin(), angles_of_collision_list.end(), 0.0f);
+					predicted_velocity.set_angle(sum_angles_of_collision);
 				}
 
 				player.set_velocity(predicted_velocity);
