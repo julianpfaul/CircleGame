@@ -142,15 +142,15 @@ namespace jp::cg {
 				auto predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
 				auto predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
 
-				auto angles_of_collision_list = std::vector<f32>();
-
 				/* arena collision */
 				if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
 					auto normal_force = predicted_velocity;
 					normal_force.set_angle(predicted_position.get_negated().get_angle());
 
 					acceleration += normal_force;
-					angles_of_collision_list.push_back(normal_force.get_angle());
+
+					predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
+					predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
 
 					if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
 						auto correction_vector = predicted_position;
@@ -168,7 +168,9 @@ namespace jp::cg {
 						normal_force.set_angle(difference_vector.get_angle());
 
 						acceleration += normal_force;
-						angles_of_collision_list.push_back(normal_force.get_angle());
+
+						predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
+						predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
 
 						difference_vector = (predicted_position - circle_obstacle.get_center());
 						if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
@@ -177,11 +179,6 @@ namespace jp::cg {
 							predicted_position = circle_obstacle.get_center() + difference_vector;
 						}
 					}
-				}
-
-				if(!angles_of_collision_list.empty()) {
-					auto sum_angles_of_collision = std::accumulate(angles_of_collision_list.begin(), angles_of_collision_list.end(), 0.0f);
-					predicted_velocity.set_angle(sum_angles_of_collision);
 				}
 
 				player.set_velocity(predicted_velocity);
