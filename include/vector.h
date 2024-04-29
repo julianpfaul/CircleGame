@@ -27,6 +27,8 @@ namespace jp {
 		[[nodiscard]] Vector get_rotated(f32 radians) const;
 		[[nodiscard]] Vector get_rotated_in_degrees(f32 degrees) const;
 
+		[[nodiscard]] f32 get_dot_product(const Vector& other) const;
+
 		void operator+=(const Vector& other);
 		void operator-=(const Vector& other);
 		void operator*=(f32 scalar);

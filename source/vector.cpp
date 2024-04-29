@@ -72,6 +72,10 @@ namespace jp {
 		return Vector::from_polar_coordinates(get_magnitude(), static_cast<f32>(get_angle() + degrees * M_PI / 180.0));
 	}
 
+	f32 Vector::get_dot_product(const Vector& other) const {
+		return data.x * other.data.x + data.y * other.data.y;
+	}
+
 	void Vector::operator+=(const Vector& other) {
 		data.x += other.data.x;
 		data.y += other.data.y;
@@ -123,7 +127,6 @@ namespace jp {
 	Vector Vector::unit_y() {
 		return Vector({0.0, 1.0});
 	}
-
 	Vector Vector::from_angle(f32 angle) {
 		return Vector({static_cast<f32>(std::cos(angle)), static_cast<f32>(std::sin(angle))});
 	}

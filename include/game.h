@@ -3,6 +3,8 @@
 #include <set>
 #include <numeric>
 #include <cmath>
+#include <iostream>
+#include <random>
 #include "SFML/Graphics.hpp"
 #include "vector.h"
 #include "arena.h"
@@ -10,6 +12,21 @@
 #include "circleobstacle.h"
 
 namespace jp::cg {
+
+	void draw_vector(sf::RenderWindow& window, Vector vector) {
+		auto buffer = sf::VertexArray(sf::Lines, 2);
+		buffer[0].position = sf::Vector2f(0.0f, 0.0f);
+		buffer[1].position = sf::Vector2f(vector.get_x(), vector.get_y());
+		window.draw(buffer);
+	}
+
+	void draw_vector_from(sf::RenderWindow& window, Vector vector, Vector origin) {
+		auto buffer = sf::VertexArray(sf::Lines, 2);
+		buffer[0].position = sf::Vector2f(origin.get_x(), origin.get_y());
+		buffer[1].position = sf::Vector2f(vector.get_x() + origin.get_x(), vector.get_y() + origin.get_y());
+		window.draw(buffer);
+	}
+
 	static void run() {
 		/* constants */
 		constexpr auto window_width = 800;
@@ -33,7 +50,7 @@ namespace jp::cg {
 		arena.set_radius(1.0f * game_scaler);
 
 		constexpr auto player_radius = 0.025f * game_scaler;
-		constexpr auto player_strength = 0.4f * game_scaler;
+		constexpr auto player_strength = 0.9f * game_scaler;
 		auto player = Player::create();
 		player.set_position(Vector::zero());
 		player.set_velocity(Vector::zero());
@@ -41,9 +58,23 @@ namespace jp::cg {
 		/* immutable objects */
 		auto circle_list = std::vector<CircleObstacle>();
 		circle_list.push_back(CircleObstacle::create(0.5f * game_scaler, Vector::from_polar_coordinates(0.5f * game_scaler, 0.0f)));
+		circle_list.push_back(CircleObstacle::create(0.2f * game_scaler, Vector::from_cartesian_coordinates(-0.2f * game_scaler, 0.4f * game_scaler)));
+
+		auto random = std::random_device();
+		auto generator = std::mt19937(random());
+		auto distribution = std::uniform_real_distribution<f32>(-1.0f, 1.0f);
+
+		/* populate the arena with random circles */
+		for (auto index = 0; index < 10; index++) {
+			auto circle = CircleObstacle::create(0.05f * game_scaler, Vector::from_cartesian_coordinates(distribution(generator) * game_scaler, distribution(generator) *
+			game_scaler));
+			circle_list.push_back(circle);
+		}
 
 		/* physics */
-		constexpr auto gravitational_strength = 0.2f * game_scaler;
+		constexpr auto multi_body_collision_resolution_factor = 0.01f;
+
+		constexpr auto gravitational_strength = 0.02f * game_scaler;
 		auto gravitational_force = Vector::from_cartesian_coordinates(0.0, gravitational_strength);
 
 		/* game loop stuff */
@@ -54,7 +85,8 @@ namespace jp::cg {
 		auto delta_time = sf::Time::Zero;
 		auto previous_time = clock.getElapsedTime();
 
-		constexpr auto time_scale = 5.0f; //  this has to be a float because of some ambiguous function overload when using double
+		constexpr auto time_scale = 9.5f; //  this has to be a float because of some ambiguous function overload when using double
+
 		auto current_update_time = sf::Time::Zero;
 		auto delta_update_time = sf::Time::Zero;
 		auto previous_update_time = clock.getElapsedTime();
@@ -62,7 +94,6 @@ namespace jp::cg {
 		/* input */
 		auto left_pressed = false;
 		auto right_pressed = false;
-		auto down_pressed = false;
 
 		while (window.isOpen()) {
 			current_time = clock.getElapsedTime();
@@ -78,30 +109,22 @@ namespace jp::cg {
 				}
 
 				if (event.type == sf::Event::KeyPressed) {
-					if (event.key.code == sf::Keyboard::Left) {
+					if (event.key.code == sf::Keyboard::A) {
 						left_pressed = true;
 					}
 
-					if (event.key.code == sf::Keyboard::Right) {
+					if (event.key.code == sf::Keyboard::D) {
 						right_pressed = true;
-					}
-
-					if (event.key.code == sf::Keyboard::Down) {
-						down_pressed = true;
 					}
 				}
 
 				if (event.type == sf::Event::KeyReleased) {
-					if (event.key.code == sf::Keyboard::Left) {
+					if (event.key.code == sf::Keyboard::A) {
 						left_pressed = false;
 					}
 
-					if (event.key.code == sf::Keyboard::Right) {
+					if (event.key.code == sf::Keyboard::D) {
 						right_pressed = false;
-					}
-
-					if (event.key.code == sf::Keyboard::Down) {
-						down_pressed = false;
 					}
 				}
 
@@ -128,58 +151,63 @@ namespace jp::cg {
 				acceleration += gravitational_force;
 
 				if (left_pressed) {
-					acceleration += Vector::from_cartesian_coordinates(-player_strength, 0.0);
+					acceleration += Vector::from_cartesian_coordinates(-player_strength, 0.0) * delta_update_time.asSeconds();
 				}
 
 				if (right_pressed) {
-					acceleration += Vector::from_cartesian_coordinates(player_strength, 0.0);
-				}
-
-				if (down_pressed) {
-					acceleration += Vector::from_cartesian_coordinates(0.0, player_strength);
+					acceleration += Vector::from_cartesian_coordinates(player_strength, 0.0) * delta_update_time.asSeconds();
 				}
 
 				auto predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
 				auto predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
 
-				/* arena collision */
-				if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
-					auto normal_force = predicted_velocity;
-					normal_force.set_angle(predicted_position.get_negated().get_angle());
+				bool did_hit_arena = false;
+				std::vector<CircleObstacle> hit_obstacle_list;
+				/* arena collision check */
+				did_hit_arena = predicted_position.get_magnitude() + player_radius > arena.get_radius();
 
-					acceleration += normal_force;
-
-					predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
-					predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
-
-					if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
-						auto correction_vector = predicted_position;
-						correction_vector.set_magnitude(arena.get_radius() - player_radius);
-
-						predicted_position = correction_vector;
-					}
-				}
-
-				/* obstacle collision */
+				/* obstacle collision check */
 				for (auto& circle_obstacle: circle_list) {
 					auto difference_vector = (predicted_position - circle_obstacle.get_center());
 					if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
-						auto normal_force = predicted_velocity;
-						normal_force.set_angle(difference_vector.get_angle());
-
-						acceleration += normal_force;
-
-						predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
-						predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
-
-						difference_vector = (predicted_position - circle_obstacle.get_center());
-						if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
-							difference_vector.set_magnitude(circle_obstacle.get_radius() + player_radius);
-
-							predicted_position = circle_obstacle.get_center() + difference_vector;
-						}
+						hit_obstacle_list.push_back(circle_obstacle);
 					}
 				}
+
+				auto resolution_count = 0.0f;
+
+				do {
+					/* collision resolution */
+					if (did_hit_arena) {
+						auto normal_vector = predicted_position.get_normalized().get_negated().get_rotated_in_degrees(90);
+
+						predicted_position.set_magnitude(arena.get_radius() - player_radius - resolution_count);
+						predicted_velocity = normal_vector * predicted_velocity.get_dot_product(normal_vector);
+					}
+
+					for (auto& hit_obstacle: hit_obstacle_list) {
+						auto normal_vector = (predicted_position - hit_obstacle.get_center()).get_normalized();
+
+						predicted_position = hit_obstacle.get_center() + normal_vector * (hit_obstacle.get_radius() + player_radius + resolution_count);
+						predicted_velocity = normal_vector.get_rotated_in_degrees(-90) * predicted_velocity.get_dot_product(normal_vector.get_rotated_in_degrees(-90));
+					}
+
+					/* check if collisions resolved */
+					hit_obstacle_list.clear();
+
+					/* arena collision check */
+					did_hit_arena = predicted_position.get_magnitude() + player_radius > arena.get_radius();
+
+					/* obstacle collision check */
+					for (auto& circle_obstacle: circle_list) {
+						auto difference_vector = (predicted_position - circle_obstacle.get_center());
+						if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
+							hit_obstacle_list.push_back(circle_obstacle);
+						}
+					}
+
+					resolution_count += multi_body_collision_resolution_factor * delta_update_time.asSeconds();
+				} while ((did_hit_arena || !hit_obstacle_list.empty()));
 
 				player.set_velocity(predicted_velocity);
 				player.set_position(predicted_position);
@@ -235,6 +263,8 @@ namespace jp::cg {
 
 					window.draw(circle);
 				}
+
+				draw_vector_from(window, player.get_velocity(), player.get_position());
 
 				window.display();
 			}
