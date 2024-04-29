@@ -140,6 +140,7 @@ namespace jp::cg {
 				auto predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
 				auto predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
 
+				/*
 				/* arena collision x */
 				if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
 					auto normal_force = predicted_velocity;
@@ -214,6 +215,44 @@ namespace jp::cg {
 							difference_vector.set_magnitude(circle_obstacle.get_radius() + player_radius);
 
 							predicted_position.set_y((circle_obstacle.get_center() + difference_vector).get_y());
+						}
+					}
+				}
+				*/
+
+					/* arena collision */
+				if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
+					auto normal_force = predicted_velocity;
+					normal_force.set_angle(predicted_position.get_negated().get_angle());
+
+					acceleration += normal_force;
+					predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
+					predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
+
+					if (predicted_position.get_magnitude() + player_radius > arena.get_radius()) {
+						auto correction_vector = predicted_position;
+						correction_vector.set_magnitude(arena.get_radius() - player_radius);
+
+						predicted_position = correction_vector;
+					}
+				}
+
+				/* obstacle collision */
+				for (auto& circle_obstacle: circle_list) {
+					auto difference_vector = (predicted_position - circle_obstacle.get_center());
+					if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
+						auto normal_force = predicted_velocity;
+						normal_force.set_angle(difference_vector.get_angle());
+
+						acceleration += normal_force;
+						predicted_velocity = player.get_velocity() + acceleration * delta_update_time.asSeconds();
+						predicted_position = player.get_position() + predicted_velocity * delta_update_time.asSeconds();
+
+						difference_vector = (predicted_position - circle_obstacle.get_center());
+						if (difference_vector.get_magnitude() < circle_obstacle.get_radius() + player_radius) {
+							difference_vector.set_magnitude(circle_obstacle.get_radius() + player_radius);
+
+							predicted_position = circle_obstacle.get_center() + difference_vector;
 						}
 					}
 				}
