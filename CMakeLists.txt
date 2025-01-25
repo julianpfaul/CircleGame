@@ -26,8 +26,6 @@ add_executable(${PROJECT_NAME}
         include/circleobstacle.h
 )
 
-file(COPY resource DESTINATION ${CMAKE_BINARY_DIR})
-
 target_link_libraries(${PROJECT_NAME} PRIVATE sfml-graphics)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
