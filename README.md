@@ -1,4 +1,4 @@
-![Screenshot of the Game](resource/screenshot.png)
+![Screenshot of the Game](screenshot.png)
 
 ## How to Build?
 
